@@ -1,0 +1,184 @@
+集成方式：将tinyxml2.h和tinyxml2.cpp拷贝到工程目录，包含头文件，#include "tinyxml2.h"，using namespace tinyxml2即可
+示例：
+#include "tinyxml2.h"
+using namespace tinyxml2;
+
+1）读：
+
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+  <elements>
+    <element name="mt_tablename">
+      <![CDATA[31b639db-d5ec-475f-bd69-f78b17df6477]]>
+    </element>
+    <element name="mt_id">
+      <![CDATA[240]]>
+    </element>
+ </elements>
+ </root>
+
+
+int CGenerateSample::ReadOriImageXML(string& strTableName, string& strImageUUID, string& strAqTime)
+{
+	// 新建一个空文档
+	XMLDocument xmlDoc;
+
+	// 读取指定的xml文件并判断读取是否成功
+	XMLError eResult = xmlDoc.LoadFile(strInImageXML.c_str());
+	if (eResult != XML_SUCCESS)
+	{
+		cout << "error\n";
+		return XML_ERROR_FILE_NOT_FOUND;
+	}
+
+	// 获得该文件的第一个节点（根节点）
+	XMLElement * pRoot = xmlDoc.RootElement();
+	if (pRoot == nullptr)
+		return XML_ERROR_FILE_READ_ERROR;
+
+	// 找到该节点中的名字为 "IntValue"的第一个子节点
+	//XMLNode* nooo=pRoot->FirstChild();
+	XMLElement * pElements = pRoot->FirstChildElement("elements");
+	if (pElements == nullptr)
+		return XML_ERROR_PARSING_ELEMENT;
+	XMLElement* pElement = pElements->FirstChildElement("element");
+	while (pElement)
+	{
+		const XMLAttribute* eleAttr = pElement->FirstAttribute();
+		while (eleAttr)
+		{
+			string strCurText = eleAttr->Value();
+			if (strCurText == "mt_tablename")
+			{
+				strTableName = pElement->GetText();
+				break;
+			}
+			else if (strCurText == "mt_uuid")
+			{
+				strImageUUID = pElement->GetText();
+				break;
+			}
+			else if (strCurText == "mt_acquiretime")
+			{
+				strAqTime = pElement->GetText();
+				break;
+			}
+			else
+			{
+				eleAttr = eleAttr->Next();
+			}
+			
+		}
+		pElement = pElement->NextSiblingElement("element");
+	}
+	vector<string> strDateTime=splitText(strAqTime, " ");
+	if (strDateTime.size() != 2)
+	{
+		return -1;
+	}
+	string strDate = strDateTime[0];
+	vector<string> strDates = splitText(strDate, "-");
+	if (strDates.size() < 3)
+	{
+		return -1;
+	}
+	string strYear = strDates[0];
+	string strMonth = strDates[1];
+	string strDay = strDates[2];
+	if (strDates[1].size() < 2)
+	{
+		strMonth = "0";
+		strMonth += strDates[1];
+	}
+	if (strDates[2].size() < 2)
+	{
+		strDay = "0";
+		strDay += strDates[2];
+	}
+	strAqTime = strYear+"-"+strMonth+"-"+strDay;
+	return 0;
+}
+
+
+2）写：
+<?xml version="1.0" encoding="UTF-8"?>
+<gdos_sample_meta>
+    <image_name>215000_asgdrged</image_name>
+    <unique_code>asgdrged</unique_code>
+    <data_bound>POLYGON ((111.554028 36.0425448,111.554028 36.1209096,111.561228 36.1209096,111.561228 36.0425448,111.554028 36.0425448))</data_bound>
+    <image_src_tablename>0ce2e6b5-2ffa-44cc-9ff7-57a27a0e6d1d</image_src_tablename>
+    <image_src_uuid>d7d00370-6a9d-416c-aef5-7b1a3c0c08bf</image_src_uuid>
+    <province>江苏省</province>
+    <city>苏州市</city>
+    <district>高新区</district>
+    <time_phase>2016-03-16</time_phase>
+    <path></path>
+</gdos_sample_meta>
+
+
+int CGenerateSample::GenImageXML(string strPostCode,string strUUID,string strProvince,string strCity,string strDistrict,string strWKT,string strTableName,string strImageUUID,string strAqTime,string strOutPath)
+{
+	// 新建一个空文档（表示完整的xml）
+	XMLDocument xmlDoc;
+
+	XMLDeclaration* dec = xmlDoc.NewDeclaration("xml version=\"1.0\" encoding=\"UTF-8\"");
+	xmlDoc.InsertFirstChild(dec);
+
+	// 新节点
+	XMLNode * pRoot = xmlDoc.NewElement("gdos_sample_meta");
+
+	// 插入到xmlDoc的第一个节点（根节点）
+	xmlDoc.InsertEndChild(pRoot);
+
+	// 新建一个元素
+	XMLElement *pElement = xmlDoc.NewElement("image_name");
+
+	// 设置该元素（节点）的值
+
+	string strImageName = strPostCode + "_" + strUUID;
+	pElement->SetText(strImageName.c_str());
+	pRoot->InsertEndChild(pElement);
+
+	pElement = xmlDoc.NewElement("unique_code");
+	pElement->SetText(strUUID.c_str());
+	pRoot->InsertEndChild(pElement);
+
+	pElement = xmlDoc.NewElement("data_bound");
+	pElement->SetText(strWKT.c_str());
+	pRoot->InsertEndChild(pElement);
+	
+	pElement = xmlDoc.NewElement("image_src_tablename");
+	pElement->SetText(strTableName.c_str());
+	pRoot->InsertEndChild(pElement);
+
+	pElement = xmlDoc.NewElement("image_src_uuid");
+	pElement->SetText(strImageUUID.c_str());
+	pRoot->InsertEndChild(pElement);
+
+	pElement = xmlDoc.NewElement("province");
+	pElement->SetText(strProvince.c_str());
+	pRoot->InsertEndChild(pElement);
+
+	pElement = xmlDoc.NewElement("city");
+	pElement->SetText(strCity.c_str());
+	pRoot->InsertEndChild(pElement);
+
+	pElement = xmlDoc.NewElement("district");
+	pElement->SetText(strDistrict.c_str());
+	pRoot->InsertEndChild(pElement);
+
+	pElement = xmlDoc.NewElement("time_phase");
+	pElement->SetText(strAqTime.c_str());
+	pRoot->InsertEndChild(pElement);
+
+	pElement = xmlDoc.NewElement("path");
+	pElement->SetText("");
+	pRoot->InsertEndChild(pElement);
+	// 保存文件
+	XMLError eResult = xmlDoc.SaveFile(strOutPath.c_str());
+
+	if (eResult != XML_SUCCESS)
+		cout << "error\n";
+
+	return 0;
+}
